@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>エアコン診断（スペック提案）</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#111a33; --text:#eef1ff; --muted:#a8b1d1;
+      --line:rgba(255,255,255,.12);
+      --accent:#6ee7ff; --accent2:#a78bfa;
+    }
+    body{
+      margin:0; color:var(--text);
+      font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+      background:
+        radial-gradient(1000px 500px at 15% 10%, rgba(110,231,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 85% 15%, rgba(167,139,250,.18), transparent 55%),
+        var(--bg);
+    }
+    .wrap{max-width:1050px;margin:0 auto;padding:26px 16px 60px;}
+    header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    h1{margin:0;font-size:22px}
+    .sub{margin-top:6px;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media (min-width:900px){ .grid{grid-template-columns:1.15fr .85fr} }
+    .card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow:0 12px 30px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .hd{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.10);display:flex;justify-content:space-between;align-items:center}
+    .hd b{font-size:14px}
+    .badge{font-size:12px;color:var(--muted);border:1px solid rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.18)}
+    .bd{padding:16px}
+    .q{border:1px solid rgba(255,255,255,.10);background:rgba(0,0,0,.18);border-radius:14px;padding:12px;margin-bottom:12px}
+    .q label{display:block;font-weight:800;font-size:14px;margin-bottom:8px}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    input[type="number"], select{
+      background:#0b1228;color:var(--text);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;
+      padding:10px 12px;
+      outline:none;
+      min-width:220px;
+    }
+    .help{color:var(--muted);font-size:12px;margin-top:8px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    button{
+      border:1px solid rgba(255,255,255,.16);
+      background:linear-gradient(90deg, rgba(110,231,255,.20), rgba(167,139,250,.20));
+      color:var(--text);
+      padding:10px 14px;border-radius:14px;cursor:pointer
+    }
+    button.secondary{background:rgba(255,255,255,.06)}
+    .result{display:grid;gap:10px}
+    .pill{
+      display:inline-flex;gap:8px;align-items:center;
+      padding:8px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.04);
+      color:var(--muted);font-size:13px
+    }
+    .kpi{
+      padding:14px;border-radius:16px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.18);
+    }
+    .kpi .t{color:var(--muted);font-size:12px}
+    .kpi .v{font-size:22px;font-weight:900;margin-top:4px}
+    ul{margin:8px 0 0 0;padding-left:18px}
+    .note{color:var(--muted);font-size:12px;border-top:1px dashed rgba(255,255,255,.16);padding-top:12px;margin-top:10px;line-height:1.7}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;}
+    .mini{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>エアコン診断（スペック提案）</h1>
+      <div class="sub">設問 → 目安の「必要スペック」を表示（機種・価格は出しません）</div>
+    </div>
+    <div class="badge">HTML + JS / サーバ不要</div>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <div class="hd"><b>入力</b><span class="badge">係数で概算</span></div>
+      <div class="bd">
+
+        <div class="q">
+          <label>1) 部屋の広さ（畳）</label>
+          <div class="row">
+            <input id="tatami" type="number" min="1" step="0.5" value="10">
+            <span class="mini">例：6 / 8 / 10 / 12.5</span>
+          </div>
+          <div class="help">㎡しか分からない場合は、あとで「㎡→畳換算」設問を追加可能です。</div>
+        </div>
+
+        <div class="q">
+          <label>2) 住宅タイプ</label>
+          <div class="row">
+            <select id="housing">
+              <option value="wood">戸建（木造が多い想定）</option>
+              <option value="rc" selected>集合（RC/鉄筋が多い想定）</option>
+            </select>
+          </div>
+          <div class="help">同じ畳数でも、木造寄りは負荷が上がる前提で補正します。</div>
+        </div>
+
+        <div class="q">
+          <label>3) 断熱（目安）</label>
+          <div class="row">
+            <select id="insulation">
+              <option value="good">高い（新しめ/高断熱）</option>
+              <option value="normal" selected>標準（一般的）</option>
+              <option value="poor">低い（古め/すきま風がある）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="q">
+          <label>4) 日当たり・窓</label>
+          <div class="row">
+            <select id="sun">
+              <option value="low">少ない（北向き/窓小）</option>
+              <option value="normal" selected>普通</option>
+              <option value="high">多い（南向き/大きい窓）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="q">
+          <label>5) 天井高</label>
+          <div class="row">
+            <select id="ceiling">
+              <option value="normal" selected>標準（〜2.4m程度）</option>
+              <option value="high">高め（2.5m以上）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="q">
+          <label>6) 隣室につながっている？（LDK続きなど）</label>
+          <div class="row">
+            <select id="openPlan">
+              <option value="no" selected>いいえ（独立した部屋）</option>
+              <option value="yes">はい（続き間/吹き抜け気味）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="q">
+          <label>7) 在室人数（ふだん）</label>
+          <div class="row">
+            <select id="people">
+              <option value="1" selected>1人</option>
+              <option value="2">2人</option>
+              <option value="3">3人</option>
+              <option value="4">4人以上</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="q">
+          <label>8) 暖房も重視する？</label>
+          <div class="row">
+            <select id="heating">
+              <option value="yes" selected>はい（冬もしっかり）</option>
+              <option value="no">いいえ（冷房メイン）</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="btns">
+          <button id="calcBtn">診断する</button>
+          <button class="secondary" id="resetBtn">リセット</button>
+        </div>
+
+        <div class="note">
+          このサンプルは「設問→係数→必要kW→上位クラスへ丸め」という作りです。<br>
+          貴社の基準（畳数区分、係数、200V推奨ライン等）に合わせて調整できます。
+        </div>
+
+      </div>
+    </section>
+
+    <aside class="card">
+      <div class="hd"><b>結果（スペック）</b><span class="badge">目安</span></div>
+      <div class="bd">
+        <div class="result" id="result">
+          <div class="pill">入力して「診断する」を押してください</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  // =========================
+  // 1) 畳数→代表クラス（冷房能力kW）の簡易テーブル
+  //    ※ここは「貴社の畳数/能力ライン」に置き換えてOK
+  // =========================
+  const CLASS_TABLE = [
+    { className: "6畳クラス",  maxTatami: 6,  kw: 2.2 },
+    { className: "8畳クラス",  maxTatami: 8,  kw: 2.5 },
+    { className: "10畳クラス", maxTatami: 10, kw: 2.8 },
+    { className: "12畳クラス", maxTatami: 12, kw: 3.6 },
+    { className: "14畳クラス", maxTatami: 14, kw: 4.0 },
+    { className: "18畳クラス", maxTatami: 18, kw: 5.6 },
+    { className: "20畳クラス", maxTatami: 20, kw: 6.3 },
+    { className: "23畳クラス", maxTatami: 23, kw: 7.1 },
+    { className: "26畳クラス", maxTatami: 26, kw: 8.0 }
+  ];
+
+  function baseClassFromTatami(t) {
+    for (const r of CLASS_TABLE) if (t <= r.maxTatami) return r;
+    // 26畳超は要現地として大きめに見積もる（簡易）
+    const extra = Math.ceil((t - 26) / 2);     // 2畳ごとに+0.5kW
+    const kw = 8.0 + extra * 0.5;
+    return { className: `${t}畳相当（要現地確認）`, maxTatami: t, kw };
+  }
+
+  // =========================
+  // 2) 係数（＝設問の重み）
+  //    ※ここが診断ツールの「肝」なので、後で一緒に調整できます
+  // =========================
+  function calcFactor({ housing, insulation, sun, ceiling, openPlan, people }) {
+    let f = 1.00;
+
+    // 住宅タイプ：木造寄りは負荷高め想定
+    if (housing === "wood") f *= 1.08;
+    if (housing === "rc")   f *= 0.98;
+
+    // 断熱
+    if (insulation === "good") f *= 0.92;
+    if (insulation === "poor") f *= 1.12;
+
+    // 日当たり/窓
+    if (sun === "low")  f *= 0.95;
+    if (sun === "high") f *= 1.10;
+
+    // 天井高
+    if (ceiling === "high") f *= 1.08;
+
+    // 続き間（空気が逃げる/負荷増）
+    if (openPlan === "yes") f *= 1.12;
+
+    // 在室人数（発熱＋出入り）
+    if (people === "2") f *= 1.03;
+    if (people === "3") f *= 1.06;
+    if (people === "4") f *= 1.10;
+
+    return f;
+  }
+
+  // 必要kWを「上位クラス」に丸める
+  function roundUpClassByKw(needKw) {
+    const sorted = [...CLASS_TABLE].sort((a,b)=>a.kw-b.kw);
+    for (const r of sorted) if (needKw <= r.kw) return r;
+    return { className: "大型（要現地確認）", kw: needKw };
+  }
+
+  // 電源の目安（ここも貴社運用に合わせて変更可）
+  function recommendPowerByKw(classKw) {
+    // ざっくり：4.0kW以上は200Vが多い、という目安
+    if (classKw >= 4.0) return "200V推奨（機種により100Vもあり）";
+    return "100Vが多い（機種により200Vもあり）";
+  }
+
+  // スペックだけ出したい場合でも「推奨要件（任意）」は役立つことが多いので付ける
+  function recommendSpecNotes({ heating }) {
+    const notes = [];
+    notes.push("インバーター機（省エネ制御）を前提に選定");
+    notes.push("フィルター掃除のしやすさ/内部乾燥（カビ対策）を優先");
+
+    if (heating === "yes") {
+      notes.push("暖房も重視：低外気温時の暖房能力・霜取り制御が強いシリーズを優先");
+    } else {
+      notes.push("冷房メイン：除湿性能（再熱/弱冷房除湿などの方式）も比較ポイント");
+    }
+    notes.push("設置条件（配管長/室外機置場/専用回路）により適合が変わるため最終確認が必要");
+    return notes;
+  }
+
+  const $ = (id) => document.getElementById(id);
+
+  function fmt1(x){ return (Math.round(x*10)/10).toFixed(1); }
+
+  function render(res){
+    $("result").innerHTML = `
+      <div class="pill">推奨クラス：<span class="mono">${res.className}</span></div>
+
+      <div class="kpi">
+        <div class="t">必要冷房能力（目安）</div>
+        <div class="v">${res.needKw} <span class="mini">kW</span></div>
+        <div class="mini">（基準 ${res.baseKw}kW × 補正 ${res.factor}）</div>
+      </div>
+
+      <div class="kpi">
+        <div class="t">選定の基準となるクラス（丸め）</div>
+        <div class="v">${res.roundedKw} <span class="mini">kW</span></div>
+        <div class="mini">このクラス以上の能力の機種を選ぶ想定</div>
+      </div>
+
+      <div class="kpi">
+        <div class="t">電源（目安）</div>
+        <div class="v" style="font-size:16px;font-weight:800">${res.power}</div>
+      </div>
+
+      <div class="kpi">
+        <div class="t">推奨要件（スペック観点）</div>
+        <ul>
+          ${res.notes.map(n => `<li>${n}</li>`).join("")}
+        </ul>
+      </div>
+
+      <div class="note">
+        <b>調整ポイント：</b><br>
+        ・畳数→kWテーブル（CLASS_TABLE）<br>
+        ・補正係数（calcFactor）<br>
+        ・200V推奨ライン（recommendPowerByKw）<br>
+        ここを貴社基準に合わせれば、そのまま本番ロジックになります。
+      </div>
+    `;
+  }
+
+  function calc(){
+    const tatami = Number($("tatami").value);
+    if (!Number.isFinite(tatami) || tatami <= 0) {
+      $("result").innerHTML = `<div class="pill">畳数を正しく入力してください</div>`;
+      return;
+    }
+
+    const input = {
+      tatami,
+      housing: $("housing").value,
+      insulation: $("insulation").value,
+      sun: $("sun").value,
+      ceiling: $("ceiling").value,
+      openPlan: $("openPlan").value,
+      people: $("people").value,
+      heating: $("heating").value
+    };
+
+    const base = baseClassFromTatami(input.tatami);
+    const factor = calcFactor(input);
+    const needKwRaw = base.kw * factor;
+
+    const rounded = roundUpClassByKw(needKwRaw);
+
+    render({
+      className: rounded.className,
+      baseKw: fmt1(base.kw),
+      factor: fmt1(factor),
+      needKw: fmt1(needKwRaw),
+      roundedKw: fmt1(rounded.kw),
+      power: recommendPowerByKw(rounded.kw),
+      notes: recommendSpecNotes(input)
+    });
+  }
+
+  function reset(){
+    $("tatami").value = 10;
+    $("housing").value = "rc";
+    $("insulation").value = "normal";
+    $("sun").value = "normal";
+    $("ceiling").value = "normal";
+    $("openPlan").value = "no";
+    $("people").value = "1";
+    $("heating").value = "yes";
+    $("result").innerHTML = `<div class="pill">入力して「診断する」を押してください</div>`;
+  }
+
+  $("calcBtn").addEventListener("click", calc);
+  $("resetBtn").addEventListener("click", reset);
+  reset();
+</script>
+</body>
+</html>
